@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>10.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>TextureUnifier</AssemblyName>
+    <RootNamespace>TextureUnifier</RootNamespace>
+    <Version>0.1.31</Version>
+    <Authors>Vipraz</Authors>
+    <Description>Configurable terrain, road, sidewalk, gravel, and experimental foliage texture replacement for Cities: Skylines II.</Description>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <GamePath Condition="'$(GamePath)' == ''">E:\SteamLibrary\steamapps\common\Cities Skylines II</GamePath>
+    <ManagedPath>$(GamePath)\Cities2_Data\Managed</ManagedPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="dist\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Game">
+      <HintPath>$(ManagedPath)\Game.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Colossal.Logging">
+      <HintPath>$(ManagedPath)\Colossal.Logging.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Colossal.Core">
+      <HintPath>$(ManagedPath)\Colossal.Core.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Colossal.Mathematics">
+      <HintPath>$(ManagedPath)\Colossal.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Colossal.IO.AssetDatabase">
+      <HintPath>$(ManagedPath)\Colossal.IO.AssetDatabase.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Colossal.Localization">
+      <HintPath>$(ManagedPath)\Colossal.Localization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json">
+      <HintPath>$(ManagedPath)\Newtonsoft.Json.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Entities">
+      <HintPath>$(ManagedPath)\Unity.Entities.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Collections">
+      <HintPath>$(ManagedPath)\Unity.Collections.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Unity.Mathematics">
+      <HintPath>$(ManagedPath)\Unity.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedPath)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedPath)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.ImageConversionModule">
+      <HintPath>$(ManagedPath)\UnityEngine.ImageConversionModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.VFXModule">
+      <HintPath>$(ManagedPath)\UnityEngine.VFXModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,27 @@
+bin/
+obj/
+dist/
+Library/
+
+.vs/
+.vscode/
+*.user
+*.suo
+*.cache
+*.log
+
+*.zip
+*.nupkg
+
+# Local publishing workflow files.
+MOD_PAGE.md
+PUBLISHING.md
+RELEASE_CHECKLIST.md
+publish.ps1
+Properties/PublishConfiguration.xml
+
+# Build outputs produced by the CS2 mod postprocessor.
+*.dll
+*.pdb
+*.so
+*.bundle
