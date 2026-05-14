@@ -7,6 +7,8 @@ namespace TextureUnifier;
 
 public sealed class TextureUnifierSystem : GameSystemBase
 {
+    private const float MinNetworkRescanIntervalSeconds = 30f;
+
     internal static TextureUnifierSystem? ActiveSystem { get; private set; }
 
     private ILog _log = TextureUnifierMod.Log;
@@ -79,7 +81,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
             }
 
             _nextTerrainApply = now + _config.TerrainApplyIntervalSeconds;
-            _nextNetworkScan = now + _config.Networks.RescanIntervalSeconds;
+            _nextNetworkScan = GetNextNetworkScanTime(now, _config.Networks);
             _nextFoliageApply = now + 1f;
             return;
         }
@@ -112,7 +114,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
                 _log.Error($"Texture Unifier network pass failed and was disabled until config reload: {ex}");
             }
 
-            _nextNetworkScan = now + _config.Networks.RescanIntervalSeconds;
+            _nextNetworkScan = GetNextNetworkScanTime(now, _config.Networks);
         }
 
         if (!_config.Foliage.Enabled)
@@ -228,4 +230,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
         config.Enabled && !config.ApplyEveryFrame && config.ApplyIntervalSeconds > 0f
             ? now + config.ApplyIntervalSeconds
             : now + 1f;
+
+    private static float GetNextNetworkScanTime(float now, NetworkTextureConfig config) =>
+        now + Math.Max(MinNetworkRescanIntervalSeconds, config.RescanIntervalSeconds);
 }

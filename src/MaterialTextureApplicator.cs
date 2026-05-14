@@ -153,8 +153,6 @@ internal sealed class MaterialTextureApplicator
             return;
         }
 
-        RestoreAppliedMaterials(clearSummary: false);
-
         TextureSlotConfig[] slots =
         {
             config.Road,
@@ -165,6 +163,7 @@ internal sealed class MaterialTextureApplicator
         };
 
         var materials = Resources.FindObjectsOfTypeAll<Material>();
+        var matchedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var changedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var changedNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         var touchedMaterials = new HashSet<Material>();
@@ -183,11 +182,14 @@ internal sealed class MaterialTextureApplicator
                     continue;
                 }
 
+                matchedCounts.TryGetValue(slot.Name, out int matched);
+                matchedCounts[slot.Name] = matched + 1;
+                touchedMaterials.Add(material);
+
                 if (ApplySlot(material, slot))
                 {
                     changedCounts.TryGetValue(slot.Name, out int current);
                     changedCounts[slot.Name] = current + 1;
-                    touchedMaterials.Add(material);
 
                     if (!changedNames.TryGetValue(slot.Name, out var names))
                     {
@@ -215,12 +217,14 @@ internal sealed class MaterialTextureApplicator
             _originals.Remove(material);
         }
 
-        string summary = string.Join(", ", changedCounts.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}:{pair.Value}"));
-        bool noMatches = summary.Length == 0;
-        if (summary.Length == 0)
-        {
-            summary = "no network material matches";
-        }
+        string matchedSummary = string.Join(", ", matchedCounts.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}:{pair.Value}"));
+        string changedSummary = string.Join(", ", changedCounts.OrderBy(pair => pair.Key).Select(pair => $"{pair.Key}:{pair.Value}"));
+        bool noMatches = matchedSummary.Length == 0;
+        string summary = noMatches
+            ? "no network material matches"
+            : changedSummary.Length == 0
+                ? $"{matchedSummary}; changed:none"
+                : $"{matchedSummary}; changed:{changedSummary}";
 
         if (!string.Equals(summary, _lastSummary, StringComparison.Ordinal))
         {
@@ -290,40 +294,41 @@ internal sealed class MaterialTextureApplicator
             _originals[material] = MaterialSnapshot.Capture(material, textureProperties);
         }
 
+        bool changed = false;
         if (baseTexture != null)
         {
-            SetTexture(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), baseTexture);
+            changed |= SetTexture(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), baseTexture);
         }
 
         if (normalTexture != null)
         {
-            SetTexture(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), normalTexture);
+            changed |= SetTexture(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), normalTexture);
         }
 
         if (lowFrequencyScale > 0f)
         {
             var scale = new Vector2(lowFrequencyScale, lowFrequencyScale);
-            SetTextureScale(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), scale);
-            SetTextureScale(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), scale);
+            changed |= SetTextureScale(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), scale);
+            changed |= SetTextureScale(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), scale);
         }
 
         if (slot.HighFrequencyScale > 0f)
         {
             var scale = new Vector2(slot.HighFrequencyScale, slot.HighFrequencyScale);
-            SetTextureScale(material, textureProperties, DetailTextureProperties, scale);
+            changed |= SetTextureScale(material, textureProperties, DetailTextureProperties, scale);
         }
 
         if (hasSmoothness)
         {
-            material.SetFloat(Smoothness, Mathf.Clamp01(slot.Smoothness!.Value));
+            changed |= SetFloat(material, Smoothness, Mathf.Clamp01(slot.Smoothness!.Value));
         }
 
         if (hasWorldspaceScale)
         {
-            material.SetFloat(WorldspaceUVScale, slot.WorldspaceUVScale!.Value);
+            changed |= SetFloat(material, WorldspaceUVScale, slot.WorldspaceUVScale!.Value);
         }
 
-        return true;
+        return changed;
     }
 
     private Texture2D? LoadSlotTexture(string relativeOrAbsolutePath, bool linear, float normalStrength, bool suppressMissingTextureWarning)
@@ -350,26 +355,45 @@ internal sealed class MaterialTextureApplicator
         return File.Exists(path);
     }
 
-    private static void SetTexture(Material material, HashSet<int> textureProperties, IEnumerable<MaterialProperty> properties, Texture texture)
+    private static bool SetTexture(Material material, HashSet<int> textureProperties, IEnumerable<MaterialProperty> properties, Texture texture)
     {
+        bool changed = false;
         foreach (var property in properties)
         {
-            if (textureProperties.Contains(property.Id))
+            if (textureProperties.Contains(property.Id) && material.GetTexture(property.Id) != texture)
             {
                 material.SetTexture(property.Id, texture);
+                changed = true;
             }
         }
+
+        return changed;
     }
 
-    private static void SetTextureScale(Material material, HashSet<int> textureProperties, IEnumerable<MaterialProperty> properties, Vector2 scale)
+    private static bool SetTextureScale(Material material, HashSet<int> textureProperties, IEnumerable<MaterialProperty> properties, Vector2 scale)
     {
+        bool changed = false;
         foreach (var property in properties)
         {
-            if (textureProperties.Contains(property.Id))
+            if (textureProperties.Contains(property.Id) && material.GetTextureScale(property.Id) != scale)
             {
                 material.SetTextureScale(property.Id, scale);
+                changed = true;
             }
         }
+
+        return changed;
+    }
+
+    private static bool SetFloat(Material material, int propertyId, float value)
+    {
+        if (!material.HasProperty(propertyId) || Mathf.Approximately(material.GetFloat(propertyId), value))
+        {
+            return false;
+        }
+
+        material.SetFloat(propertyId, value);
+        return true;
     }
 
     private static float GetLowFrequencyScale(TextureSlotConfig slot, HashSet<int> textureProperties)
