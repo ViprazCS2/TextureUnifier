@@ -340,6 +340,7 @@ internal sealed class FoliageVfxApplicator
         _appliedStates.Clear();
         _cachedEffects.Clear();
         _nextEffectScanTime = 0f;
+        _roadMaskGenerator.Reset();
     }
 
     public void Dispose()

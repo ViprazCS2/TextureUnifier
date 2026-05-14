@@ -26,8 +26,9 @@ namespace TextureUnifier;
 internal sealed class FoliageRoadMaskGenerator : IDisposable
 {
     private const float ZoneCellSizeMeters = 8f;
-    private const float ChangeCheckIntervalSeconds = 0.25f;
-    private const float ChangeRebuildDebounceSeconds = 0.35f;
+    private const float ChangeCheckIntervalSeconds = 2f;
+    private const float ChangeRebuildDebounceSeconds = 5f;
+    private const float MinSceneRebuildIntervalSeconds = 30f;
     private const float SceneHashStepsPerMeter = 4f;
 
     private readonly ILog _log;
@@ -36,6 +37,7 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
     private int _revision;
     private float _nextRefreshTime;
     private float _nextChangeCheckTime;
+    private float _nextAllowedSceneRebuildTime;
     private float _pendingRebuildTime;
     private string _lastSummary = string.Empty;
     private string _lastSignature = string.Empty;
@@ -67,6 +69,14 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
 
     public Texture? GetOrUpdate(FoliageConfig config, World world, Texture? baseSplatMap, FoliageTerrainBounds bounds, out string source, out int revision)
     {
+        if (!config.Enabled)
+        {
+            Reset();
+            source = "roadMask:disabled";
+            revision = 0;
+            return baseSplatMap;
+        }
+
         if (_material == null)
         {
             source = "roadMask:no material";
@@ -95,7 +105,7 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
             if (sceneChange != null)
             {
                 _pendingRebuildReason = sceneChange;
-                _pendingRebuildTime = now + ChangeRebuildDebounceSeconds;
+                _pendingRebuildTime = Mathf.Max(now + ChangeRebuildDebounceSeconds, _nextAllowedSceneRebuildTime);
             }
 
             if (_pendingRebuildTime > 0f && now >= _pendingRebuildTime)
@@ -104,7 +114,8 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
             }
             else if (now >= _nextRefreshTime)
             {
-                rebuildReason = "safety resync";
+                CaptureSceneBaseline(config, world, now);
+                _nextRefreshTime = now + Mathf.Max(10f, config.RoadMaskRefreshSeconds);
             }
         }
 
@@ -115,6 +126,11 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
             _hasBuiltMask = true;
             _lastSignature = signature;
             CaptureSceneBaseline(config, world, now);
+            if (rebuildReason.StartsWith("scene changed", StringComparison.Ordinal))
+            {
+                _nextAllowedSceneRebuildTime = now + MinSceneRebuildIntervalSeconds;
+            }
+
             _pendingRebuildTime = 0f;
             _pendingRebuildReason = string.Empty;
             _nextRefreshTime = now + Mathf.Max(10f, config.RoadMaskRefreshSeconds);
@@ -132,7 +148,7 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
         return _mask;
     }
 
-    public void Dispose()
+    public void Reset()
     {
         if (_mask != null)
         {
@@ -141,13 +157,21 @@ internal sealed class FoliageRoadMaskGenerator : IDisposable
             _mask = null;
         }
 
+        _lastSummary = string.Empty;
         _lastSignature = string.Empty;
         _pendingRebuildReason = string.Empty;
         _hasSceneState = false;
         _pendingRebuildTime = 0f;
         _nextChangeCheckTime = 0f;
+        _nextRefreshTime = 0f;
+        _nextAllowedSceneRebuildTime = 0f;
         _hasBuiltMask = false;
         _revision = 0;
+    }
+
+    public void Dispose()
+    {
+        Reset();
 
         if (_material != null)
         {

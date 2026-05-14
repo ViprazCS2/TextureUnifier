@@ -19,6 +19,8 @@ public sealed class TextureUnifierSystem : GameSystemBase
     private float _nextNetworkScan;
     private float _nextFoliageApply;
     private bool _networkDisabledAfterFailure;
+    private bool _modWasEnabled;
+    private bool _foliageWasApplied;
     private TextureUnifierConfig? _config;
     private TextureLoader? _textureLoader;
     private TerrainTextureApplicator? _terrainApplicator;
@@ -69,12 +71,20 @@ public sealed class TextureUnifierSystem : GameSystemBase
 
         if (!_config.Enabled)
         {
-            RestoreAll();
+            if (_modWasEnabled)
+            {
+                RestoreAll();
+                _modWasEnabled = false;
+                _foliageWasApplied = false;
+            }
+
             _nextTerrainApply = now + _config.TerrainApplyIntervalSeconds;
             _nextNetworkScan = now + _config.Networks.RescanIntervalSeconds;
-            _nextFoliageApply = GetNextFoliageApplyTime(now, _config.Foliage);
+            _nextFoliageApply = now + 1f;
             return;
         }
+
+        _modWasEnabled = true;
 
         if (now >= _nextTerrainApply)
         {
@@ -105,11 +115,26 @@ public sealed class TextureUnifierSystem : GameSystemBase
             _nextNetworkScan = now + _config.Networks.RescanIntervalSeconds;
         }
 
-        if (now >= _nextFoliageApply)
+        if (!_config.Foliage.Enabled)
+        {
+            if (_foliageWasApplied)
+            {
+                _foliageApplicator.Restore(World);
+                _foliageWasApplied = false;
+            }
+
+            _nextFoliageApply = now + 1f;
+        }
+        else if (_config.Foliage.ApplyEveryFrame)
+        {
+            _nextFoliageApply = now + 1f;
+        }
+        else if (now >= _nextFoliageApply)
         {
             try
             {
                 _foliageApplicator.Apply(_config.Foliage, World);
+                _foliageWasApplied = true;
             }
             catch (Exception ex)
             {
@@ -143,6 +168,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
         _terrainApplicator?.Restore();
         _materialApplicator?.Restore();
         _foliageApplicator?.Restore(World);
+        _foliageWasApplied = false;
     }
 
     internal void RequestConfigReload()
@@ -160,6 +186,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
         try
         {
             _foliageApplicator?.Apply(_config.Foliage, World);
+            _foliageWasApplied = true;
         }
         catch (Exception ex)
         {
@@ -186,7 +213,9 @@ public sealed class TextureUnifierSystem : GameSystemBase
             _networkDisabledAfterFailure = false;
             _nextTerrainApply = now + 0.25f;
             _nextNetworkScan = now + 0.75f;
-            _nextFoliageApply = now + 1.25f;
+            _nextFoliageApply = _config.Foliage.Enabled && !_config.Foliage.ApplyEveryFrame
+                ? now + 1.25f
+                : now + 1f;
             _log.Info($"Texture Unifier config loaded: {_configPath}");
         }
         catch (Exception ex)
@@ -195,10 +224,8 @@ public sealed class TextureUnifierSystem : GameSystemBase
         }
     }
 
-    private static float GetNextFoliageApplyTime(float now, FoliageConfig config)
-    {
-        return config.ApplyEveryFrame || config.ApplyIntervalSeconds <= 0f
-            ? now
-            : now + config.ApplyIntervalSeconds;
-    }
+    private static float GetNextFoliageApplyTime(float now, FoliageConfig config) =>
+        config.Enabled && !config.ApplyEveryFrame && config.ApplyIntervalSeconds > 0f
+            ? now + config.ApplyIntervalSeconds
+            : now + 1f;
 }
