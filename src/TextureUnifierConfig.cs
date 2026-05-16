@@ -78,6 +78,11 @@ internal sealed class TextureUnifierConfig
         Networks.Normalize();
         Foliage.Normalize();
         ApplySimpleOptionsProfile();
+        if (!string.IsNullOrWhiteSpace(ActiveTexturePack))
+        {
+            TexturePackManager.ApplyPack(this, ActiveTexturePack);
+        }
+
         SyncParkingLotTexturesToRoad();
     }
 

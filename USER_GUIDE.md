@@ -29,6 +29,7 @@ Parking-lot road surfaces use the normal road texture files. There is no separat
 6. Use the required file names below.
 
 Texture Unifier uses `MyTexturePack` automatically when it creates the folder.
+Standard pack files can use the same base name with `.png`, `.jpg`, or `.jpeg`, such as `Road_BaseColor.png` or `Road_BaseColor.jpg`.
 
 The full data folder is:
 

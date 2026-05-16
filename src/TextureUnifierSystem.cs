@@ -219,10 +219,30 @@ public sealed class TextureUnifierSystem : GameSystemBase
                 ? now + 1.25f
                 : now + 1f;
             _log.Info($"Texture Unifier config loaded: {_configPath}");
+            LogActiveTexturePack(_config);
         }
         catch (Exception ex)
         {
             _log.Error($"Texture Unifier could not load config: {ex}");
+        }
+    }
+
+    private void LogActiveTexturePack(TextureUnifierConfig config)
+    {
+        if (string.IsNullOrWhiteSpace(config.ActiveTexturePack))
+        {
+            _log.Info("Texture Unifier active texture folder: manual config paths");
+            return;
+        }
+
+        string packPath = TexturePackManager.GetPackFolderPath(config.ActiveTexturePack);
+        if (Directory.Exists(packPath))
+        {
+            _log.Info($"Texture Unifier active texture folder: {packPath}");
+        }
+        else
+        {
+            _log.Warn($"Texture Unifier active texture folder does not exist: {packPath}");
         }
     }
 

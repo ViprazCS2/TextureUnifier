@@ -83,7 +83,7 @@ The fastest path:
 
 1. Open Options -> Texture Unifier.
 2. Press `New texture folder`.
-3. Put `.png`, `.jpg`, or `.jpeg` files into the folder that opens.
+3. Put `.png`, `.jpg`, or `.jpeg` files into the folder that opens. Standard pack files can use the same base name with any of those extensions, for example `Road_BaseColor.png`, `Road_BaseColor.jpg`, or `Road_BaseColor.jpeg`.
 4. Use the required file names below.
 
 `*_BaseColor` files are the colorful textures. Normal files (the pink textures) are only for bump/surface detail; they are not color textures.

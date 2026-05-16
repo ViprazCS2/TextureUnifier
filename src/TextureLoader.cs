@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using Colossal.Logging;
 using UnityEngine;
 
@@ -9,9 +10,12 @@ namespace TextureUnifier;
 
 internal sealed class TextureLoader
 {
+    private static readonly string[] SupportedExtensions = { ".png", ".jpg", ".jpeg" };
+
     private readonly ILog _log;
     private readonly Dictionary<string, LoadedTexture> _cache = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _warnedMissingTextures = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _reportedAlternateTextures = new(StringComparer.OrdinalIgnoreCase);
 
     public TextureLoader(ILog log)
     {
@@ -25,24 +29,25 @@ internal sealed class TextureLoader
             return null;
         }
 
-        string path = Path.IsPathRooted(relativeOrAbsolutePath)
-            ? relativeOrAbsolutePath
-            : Path.Combine(rootPath, relativeOrAbsolutePath.Replace('/', Path.DirectorySeparatorChar));
-
-        if (!File.Exists(path))
+        string requestedPath = ResolveTexturePath(rootPath, relativeOrAbsolutePath);
+        if (!TryResolveExistingTexturePath(requestedPath, out string path))
         {
-            if (_warnedMissingTextures.Add(path))
+            if (_warnedMissingTextures.Add(requestedPath))
             {
-                _log.Warn($"Texture Unifier texture missing: {path}");
+                _log.Warn($"Texture Unifier texture missing: {requestedPath} (also checked the same file name with .png, .jpg, and .jpeg)");
             }
 
             return null;
         }
 
+        if (!string.Equals(path, requestedPath, StringComparison.OrdinalIgnoreCase) &&
+            _reportedAlternateTextures.Add($"{requestedPath}|{path}"))
+        {
+            _log.Info($"Texture Unifier using {path} for configured path {requestedPath}");
+        }
+
         string extension = Path.GetExtension(path);
-        if (!string.Equals(extension, ".png", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(extension, ".jpg", StringComparison.OrdinalIgnoreCase) &&
-            !string.Equals(extension, ".jpeg", StringComparison.OrdinalIgnoreCase))
+        if (!IsSupportedTextureExtension(extension))
         {
             _log.Warn($"Texture Unifier can only load png/jpg textures, skipped: {path}");
             return null;
@@ -93,6 +98,51 @@ internal sealed class TextureLoader
             _log.Warn($"Texture Unifier failed to load {path}: {ex.Message}");
             return null;
         }
+    }
+
+    public static string ResolveTexturePath(string rootPath, string relativeOrAbsolutePath)
+    {
+        return Path.IsPathRooted(relativeOrAbsolutePath)
+            ? relativeOrAbsolutePath
+            : Path.Combine(rootPath, relativeOrAbsolutePath.Replace('/', Path.DirectorySeparatorChar));
+    }
+
+    public static bool TryResolveExistingTexturePath(string rootPath, string relativeOrAbsolutePath, out string path)
+    {
+        return TryResolveExistingTexturePath(ResolveTexturePath(rootPath, relativeOrAbsolutePath), out path);
+    }
+
+    private static bool TryResolveExistingTexturePath(string requestedPath, out string path)
+    {
+        path = requestedPath;
+        if (File.Exists(requestedPath))
+        {
+            return true;
+        }
+
+        string? directory = Path.GetDirectoryName(requestedPath);
+        string stem = Path.GetFileNameWithoutExtension(requestedPath);
+        if (string.IsNullOrWhiteSpace(directory) || string.IsNullOrWhiteSpace(stem))
+        {
+            return false;
+        }
+
+        foreach (string extension in SupportedExtensions)
+        {
+            string candidate = Path.Combine(directory, stem + extension);
+            if (!string.Equals(candidate, requestedPath, StringComparison.OrdinalIgnoreCase) && File.Exists(candidate))
+            {
+                path = candidate;
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsSupportedTextureExtension(string extension)
+    {
+        return SupportedExtensions.Any(value => string.Equals(value, extension, StringComparison.OrdinalIgnoreCase));
     }
 
     private static void ApplyNormalStrength(Texture2D texture, float strength)

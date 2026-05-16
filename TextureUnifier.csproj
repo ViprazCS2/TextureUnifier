@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <AssemblyName>TextureUnifier</AssemblyName>
     <RootNamespace>TextureUnifier</RootNamespace>
-    <Version>0.1.33</Version>
+    <Version>0.1.34</Version>
     <Authors>Vipraz</Authors>
     <Description>Configurable terrain, road, sidewalk, gravel, and experimental foliage texture replacement for Cities: Skylines II.</Description>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
