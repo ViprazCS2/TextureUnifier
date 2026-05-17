@@ -48,14 +48,21 @@ internal sealed class TerrainTextureApplicator
         CacheOriginals();
 
         bool changed = false;
-        changed |= ApplyTexture(config.Grass.BaseColor, GrassDiffuse, linear: false);
-        changed |= ApplyTexture(config.Grass.Normal, GrassNormal, linear: true, config.Grass.NormalStrength);
-        changed |= ApplyTexture(config.Dirt.BaseColor, DirtDiffuse, linear: false);
-        changed |= ApplyTexture(config.Dirt.Normal, DirtNormal, linear: true, config.Dirt.NormalStrength);
-        changed |= ApplyTexture(config.Rock.BaseColor, RockDiffuse, linear: false);
-        changed |= ApplyTexture(config.Rock.Normal, RockNormal, linear: true, config.Rock.NormalStrength);
+        bool hasAnyTexture = false;
+        changed |= ApplyTexture(config.Grass.BaseColor, GrassDiffuse, false, out bool hasGrassBase);
+        hasAnyTexture |= hasGrassBase;
+        changed |= ApplyTexture(config.Grass.Normal, GrassNormal, true, config.Grass.NormalStrength, out bool hasGrassNormal);
+        hasAnyTexture |= hasGrassNormal;
+        changed |= ApplyTexture(config.Dirt.BaseColor, DirtDiffuse, false, out bool hasDirtBase);
+        hasAnyTexture |= hasDirtBase;
+        changed |= ApplyTexture(config.Dirt.Normal, DirtNormal, true, config.Dirt.NormalStrength, out bool hasDirtNormal);
+        hasAnyTexture |= hasDirtNormal;
+        changed |= ApplyTexture(config.Rock.BaseColor, RockDiffuse, false, out bool hasRockBase);
+        hasAnyTexture |= hasRockBase;
+        changed |= ApplyTexture(config.Rock.Normal, RockNormal, true, config.Rock.NormalStrength, out bool hasRockNormal);
+        hasAnyTexture |= hasRockNormal;
 
-        if (ApplyTiling(config))
+        if (hasAnyTexture && ApplyTiling(config))
         {
             changed = true;
         }
@@ -110,10 +117,21 @@ internal sealed class TerrainTextureApplicator
         }
     }
 
-    private bool ApplyTexture(string relativePath, int shaderId, bool linear, float normalStrength = 1f)
+    private bool ApplyTexture(string relativePath, int shaderId, bool linear, out bool textureLoaded)
+    {
+        return ApplyTexture(relativePath, shaderId, linear, 1f, out textureLoaded);
+    }
+
+    private bool ApplyTexture(string relativePath, int shaderId, bool linear, float normalStrength, out bool textureLoaded)
     {
         Texture2D? texture = _textureLoader.LoadTexture(_rootPath, relativePath, linear, normalStrength);
+        textureLoaded = texture != null;
         if (texture == null)
+        {
+            return false;
+        }
+
+        if (Shader.GetGlobalTexture(shaderId) == texture)
         {
             return false;
         }

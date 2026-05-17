@@ -14,6 +14,7 @@ Texture Unifier is a Cities: Skylines II code mod. This note is meant to make pu
 ## Build and Publish Scripts
 
 - `build.ps1` runs `dotnet build` and, for packages, the official Cities: Skylines II `ModPostProcessor`.
+- Build and publishing PowerShell scripts are developer helpers only. They are not loaded or executed by the in-game mod runtime.
 - Cleanup in `build.ps1` is scoped with parent-path checks before recursive deletion.
 - Generated artifacts such as `bin/`, `obj/`, `dist/`, platform binaries, and release zips are excluded from the source repository by `.gitignore`.
 

@@ -10,6 +10,8 @@ Texture Unifier does not contain network code, telemetry, native interop, regist
 
 Runtime file access is limited to the CS2 persistent data area used by the mod, plus texture files the user chooses or references in `config.json`. The Options-page folder buttons use one `Process.Start` call to open a path through the operating system shell.
 
+PowerShell files in this repository are developer build/release helpers around the official CS2 modding toolchain. They are not runtime mod code and are not executed by subscribers in-game.
+
 See [SECURITY.md](SECURITY.md) for the public review notes.
 
 ## Build

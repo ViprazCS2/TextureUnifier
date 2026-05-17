@@ -279,12 +279,17 @@ internal sealed class MaterialTextureApplicator
 
         bool hasBase = baseTexture != null;
         bool hasNormal = normalTexture != null;
+        if (!hasBase && !hasNormal)
+        {
+            return false;
+        }
+
         float lowFrequencyScale = GetLowFrequencyScale(slot, textureProperties);
-        bool hasScale = (hasBase || hasNormal) && (lowFrequencyScale > 0f || slot.HighFrequencyScale > 0f);
+        bool hasScale = lowFrequencyScale > 0f || slot.HighFrequencyScale > 0f;
         bool hasSmoothness = slot.Smoothness.HasValue && material.HasProperty(Smoothness);
         bool hasWorldspaceScale = slot.WorldspaceUVScale.HasValue && material.HasProperty(WorldspaceUVScale);
 
-        if (!hasBase && !hasNormal && !hasScale && !hasSmoothness && !hasWorldspaceScale)
+        if (!hasScale && !hasSmoothness && !hasWorldspaceScale)
         {
             return false;
         }
