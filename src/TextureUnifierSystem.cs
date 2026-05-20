@@ -7,6 +7,7 @@ namespace TextureUnifier;
 
 public sealed class TextureUnifierSystem : GameSystemBase
 {
+    private const float ConfigReloadSettleSeconds = 0.5f;
     private const float InitialNetworkScanDelaySeconds = 0.75f;
     private const float MinNetworkRescanIntervalSeconds = 300f;
 
@@ -17,13 +18,16 @@ public sealed class TextureUnifierSystem : GameSystemBase
     private string _texturesPath = string.Empty;
     private string _configPath = string.Empty;
     private DateTime _lastConfigWriteTime;
+    private DateTime _pendingConfigWriteTime;
     private float _nextConfigCheck;
+    private float _pendingConfigReloadTime;
     private float _nextTerrainApply;
     private float _nextNetworkScan;
     private float _nextFoliageApply;
     private bool _networkDisabledAfterFailure;
     private bool _modWasEnabled;
     private bool _foliageWasApplied;
+    private bool _hasPendingConfigReload;
     private TextureUnifierConfig? _config;
     private TextureLoader? _textureLoader;
     private TerrainTextureApplicator? _terrainApplicator;
@@ -206,13 +210,35 @@ public sealed class TextureUnifierSystem : GameSystemBase
         DateTime writeTime = File.Exists(_configPath) ? File.GetLastWriteTimeUtc(_configPath) : DateTime.MinValue;
         if (!force && _config != null && writeTime == _lastConfigWriteTime)
         {
+            _hasPendingConfigReload = false;
             return;
+        }
+
+        if (!force && _config != null)
+        {
+            if (!_hasPendingConfigReload || writeTime != _pendingConfigWriteTime)
+            {
+                _pendingConfigWriteTime = writeTime;
+                _pendingConfigReloadTime = now + ConfigReloadSettleSeconds;
+                _hasPendingConfigReload = true;
+            }
+
+            if (now < _pendingConfigReloadTime)
+            {
+                if (_pendingConfigReloadTime < _nextConfigCheck)
+                {
+                    _nextConfigCheck = _pendingConfigReloadTime;
+                }
+
+                return;
+            }
         }
 
         try
         {
             _config = TextureUnifierConfig.LoadOrCreate(_configPath);
             _lastConfigWriteTime = File.GetLastWriteTimeUtc(_configPath);
+            _hasPendingConfigReload = false;
             _networkDisabledAfterFailure = false;
             _nextTerrainApply = now + 0.25f;
             _nextNetworkScan = now + InitialNetworkScanDelaySeconds;

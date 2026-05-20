@@ -48,7 +48,13 @@ internal sealed class TextureUnifierConfig
     {
         Directory.CreateDirectory(Path.GetDirectoryName(configPath)!);
         Normalize();
-        File.WriteAllText(configPath, JsonConvert.SerializeObject(this, Formatting.Indented));
+        string nextJson = JsonConvert.SerializeObject(this, Formatting.Indented);
+        if (File.Exists(configPath) && string.Equals(File.ReadAllText(configPath), nextJson, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        File.WriteAllText(configPath, nextJson);
     }
 
     internal static TextureUnifierConfig CreateDefault()
