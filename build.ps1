@@ -251,7 +251,6 @@ if ($Package) {
     Copy-Item -Recurse -Force -Path (Join-Path $projectRoot "examples\*") -Destination $examplesTarget
     Copy-Item -Recurse -Force -Path (Join-Path $projectRoot "src") -Destination $sourceTarget
     Copy-Item -Force -Path $projectPath -Destination (Join-Path $sourceTarget "TextureUnifier.csproj")
-    Copy-Item -Force -Path (Join-Path $projectRoot "build.ps1") -Destination (Join-Path $sourceTarget "build.ps1")
 
     Compress-Archive -Path (Join-Path $packageRoot "TextureUnifier") -DestinationPath $zipPath -CompressionLevel Optimal
     Write-Host "Packaged release zip: $zipPath"

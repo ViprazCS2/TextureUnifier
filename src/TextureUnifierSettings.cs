@@ -358,9 +358,9 @@ public sealed class TextureUnifierSettings : ModSetting
 
     [SettingsUISection(NetworksTab, MainGroup)]
     [SettingsUIHidden]
-    [SettingsUISlider(min = 1f, max = 60f, step = 1f)]
+    [SettingsUISlider(min = 0f, max = 600f, step = 30f)]
     [SettingsUIDisplayName("", "Network rescan interval")]
-    [SettingsUIDescription("", "How often loaded materials are rescanned for road and sidewalk matches.")]
+    [SettingsUIDescription("", "Advanced. Zero disables periodic material rescans after the initial load/config apply.")]
     public float NetworkRescanIntervalSeconds { get; set; }
 
     [SettingsUISection(NetworksTab, NetworkSlotsGroup)]
@@ -792,7 +792,7 @@ public sealed class TextureUnifierSettings : ModSetting
         config.Terrain.Rock.NormalStrength = RockNormalStrength;
 
         config.Networks.Enabled = true;
-        config.Networks.RescanIntervalSeconds = NetworkRescanIntervalSeconds;
+        config.Networks.RescanIntervalSeconds = Math.Max(0f, NetworkRescanIntervalSeconds);
         config.Networks.Road.Enabled = true;
         config.Networks.RoadWear.Enabled = false;
         config.Networks.ParkingLot.Enabled = true;

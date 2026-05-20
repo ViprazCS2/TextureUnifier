@@ -99,6 +99,7 @@ internal sealed class TextureUnifierConfig
     {
         Terrain.Enabled = true;
         Networks.Enabled = true;
+        Networks.RescanIntervalSeconds = 0f;
         Networks.Road.Enabled = true;
         Networks.RoadWear.Enabled = false;
         Networks.ParkingLot.Enabled = true;
@@ -179,7 +180,7 @@ internal sealed class NetworkTextureConfig
     public bool Enabled { get; set; } = true;
 
     [JsonProperty("rescanIntervalSeconds")]
-    public float RescanIntervalSeconds { get; set; } = 5f;
+    public float RescanIntervalSeconds { get; set; } = 0f;
 
     [JsonProperty("road")]
     public TextureSlotConfig Road { get; set; } = TextureSlotConfig.Road();
@@ -200,9 +201,9 @@ internal sealed class NetworkTextureConfig
 
     public void Normalize()
     {
-        if (RescanIntervalSeconds < 1f)
+        if (RescanIntervalSeconds < 0f)
         {
-            RescanIntervalSeconds = 1f;
+            RescanIntervalSeconds = 0f;
         }
 
         Road ??= TextureSlotConfig.Road();

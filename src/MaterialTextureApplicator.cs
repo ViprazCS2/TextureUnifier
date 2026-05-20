@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using Colossal.Logging;
 using UnityEngine;
@@ -153,14 +152,13 @@ internal sealed class MaterialTextureApplicator
             return;
         }
 
-        TextureSlotConfig[] slots =
+        var slots = BuildSlotResources(config);
+        if (slots.Count == 0)
         {
-            config.Road,
-            config.RoadWear,
-            config.ParkingLot,
-            config.Sidewalk,
-            config.Gravel
-        };
+            RestoreAppliedMaterials(clearSummary: false);
+            LogNetworkSummary("no network replacement textures loaded", new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase));
+            return;
+        }
 
         var materials = Resources.FindObjectsOfTypeAll<Material>();
         var matchedCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
@@ -175,8 +173,9 @@ internal sealed class MaterialTextureApplicator
                 continue;
             }
 
-            foreach (var slot in slots)
+            foreach (var slotResources in slots)
             {
+                TextureSlotConfig slot = slotResources.Slot;
                 if (!slot.Enabled || !Matches(material, slot))
                 {
                     continue;
@@ -186,7 +185,7 @@ internal sealed class MaterialTextureApplicator
                 matchedCounts[slot.Name] = matched + 1;
                 touchedMaterials.Add(material);
 
-                if (ApplySlot(material, slot))
+                if (ApplySlot(material, slotResources))
                 {
                     changedCounts.TryGetValue(slot.Name, out int current);
                     changedCounts[slot.Name] = current + 1;
@@ -226,25 +225,17 @@ internal sealed class MaterialTextureApplicator
                 ? $"{matchedSummary}; changed:none"
                 : $"{matchedSummary}; changed:{changedSummary}";
 
-        if (!string.Equals(summary, _lastSummary, StringComparison.Ordinal))
+        bool summaryChanged = LogNetworkSummary(summary, changedNames);
+
+        if (noMatches && summaryChanged)
         {
-            _lastSummary = summary;
-            _log.Info($"Texture Unifier network pass: {summary}");
-            foreach (var pair in changedNames.OrderBy(pair => pair.Key))
+            var candidates = GetDiagnosticCandidates(materials);
+            if (candidates.Count > 0)
             {
-                _log.Info($"Texture Unifier matched {pair.Key}: {string.Join(" | ", pair.Value)}");
+                _log.Info($"Texture Unifier candidate network-ish materials: {string.Join(" | ", candidates)}");
             }
 
-            if (noMatches)
-            {
-                var candidates = GetDiagnosticCandidates(materials);
-                if (candidates.Count > 0)
-                {
-                    _log.Info($"Texture Unifier candidate network-ish materials: {string.Join(" | ", candidates)}");
-                }
-
-                LogShaderGlobals();
-            }
+            LogShaderGlobals();
         }
     }
 
@@ -270,12 +261,62 @@ internal sealed class MaterialTextureApplicator
         }
     }
 
-    private bool ApplySlot(Material material, TextureSlotConfig slot)
+    private List<SlotResources> BuildSlotResources(NetworkTextureConfig config)
     {
+        TextureSlotConfig[] configuredSlots =
+        {
+            config.Road,
+            config.RoadWear,
+            config.ParkingLot,
+            config.Sidewalk,
+            config.Gravel
+        };
+
+        var result = new List<SlotResources>();
+        foreach (var slot in configuredSlots)
+        {
+            if (!slot.Enabled)
+            {
+                continue;
+            }
+
+            bool suppressMissingTextureWarnings = IsOptionalAtlasSlot(slot);
+            Texture2D? baseTexture = LoadSlotTexture(slot.BaseColor, linear: false, normalStrength: 1f, suppressMissingTextureWarning: suppressMissingTextureWarnings);
+            Texture2D? normalTexture = LoadSlotTexture(slot.Normal, linear: true, normalStrength: slot.NormalStrength, suppressMissingTextureWarning: suppressMissingTextureWarnings);
+            if (baseTexture == null && normalTexture == null)
+            {
+                continue;
+            }
+
+            result.Add(new SlotResources(slot, baseTexture, normalTexture));
+        }
+
+        return result;
+    }
+
+    private bool LogNetworkSummary(string summary, Dictionary<string, List<string>> changedNames)
+    {
+        if (string.Equals(summary, _lastSummary, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        _lastSummary = summary;
+        _log.Info($"Texture Unifier network pass: {summary}");
+        foreach (var pair in changedNames.OrderBy(pair => pair.Key))
+        {
+            _log.Info($"Texture Unifier matched {pair.Key}: {string.Join(" | ", pair.Value)}");
+        }
+
+        return true;
+    }
+
+    private bool ApplySlot(Material material, SlotResources slotResources)
+    {
+        TextureSlotConfig slot = slotResources.Slot;
         HashSet<int> textureProperties = GetTextureProperties(material);
-        bool suppressMissingTextureWarnings = IsOptionalAtlasSlot(slot);
-        Texture2D? baseTexture = LoadSlotTexture(slot.BaseColor, linear: false, normalStrength: 1f, suppressMissingTextureWarning: suppressMissingTextureWarnings);
-        Texture2D? normalTexture = LoadSlotTexture(slot.Normal, linear: true, normalStrength: slot.NormalStrength, suppressMissingTextureWarning: suppressMissingTextureWarnings);
+        Texture2D? baseTexture = slotResources.BaseTexture;
+        Texture2D? normalTexture = slotResources.NormalTexture;
 
         bool hasBase = baseTexture != null;
         bool hasNormal = normalTexture != null;
@@ -285,11 +326,18 @@ internal sealed class MaterialTextureApplicator
         }
 
         float lowFrequencyScale = GetLowFrequencyScale(slot, textureProperties);
-        bool hasScale = lowFrequencyScale > 0f || slot.HighFrequencyScale > 0f;
+        var baseTextureProperties = GetBaseTextureProperties(material, slot, textureProperties).ToArray();
+        var normalTextureProperties = GetNormalTextureProperties(material, slot, textureProperties).ToArray();
+        bool hasLowFrequencyScale = lowFrequencyScale > 0f &&
+            baseTextureProperties.Concat(normalTextureProperties).Any(property => textureProperties.Contains(property.Id));
+        bool hasHighFrequencyScale = slot.HighFrequencyScale > 0f &&
+            DetailTextureProperties.Any(property => textureProperties.Contains(property.Id));
         bool hasSmoothness = slot.Smoothness.HasValue && material.HasProperty(Smoothness);
         bool hasWorldspaceScale = slot.WorldspaceUVScale.HasValue && material.HasProperty(WorldspaceUVScale);
+        bool hasBaseTarget = hasBase && baseTextureProperties.Any(property => textureProperties.Contains(property.Id));
+        bool hasNormalTarget = hasNormal && normalTextureProperties.Any(property => textureProperties.Contains(property.Id));
 
-        if (!hasScale && !hasSmoothness && !hasWorldspaceScale)
+        if (!hasBaseTarget && !hasNormalTarget && !hasLowFrequencyScale && !hasHighFrequencyScale && !hasSmoothness && !hasWorldspaceScale)
         {
             return false;
         }
@@ -302,19 +350,19 @@ internal sealed class MaterialTextureApplicator
         bool changed = false;
         if (baseTexture != null)
         {
-            changed |= SetTexture(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), baseTexture);
+            changed |= SetTexture(material, textureProperties, baseTextureProperties, baseTexture);
         }
 
         if (normalTexture != null)
         {
-            changed |= SetTexture(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), normalTexture);
+            changed |= SetTexture(material, textureProperties, normalTextureProperties, normalTexture);
         }
 
         if (lowFrequencyScale > 0f)
         {
             var scale = new Vector2(lowFrequencyScale, lowFrequencyScale);
-            changed |= SetTextureScale(material, textureProperties, GetBaseTextureProperties(material, slot, textureProperties), scale);
-            changed |= SetTextureScale(material, textureProperties, GetNormalTextureProperties(material, slot, textureProperties), scale);
+            changed |= SetTextureScale(material, textureProperties, baseTextureProperties, scale);
+            changed |= SetTextureScale(material, textureProperties, normalTextureProperties, scale);
         }
 
         if (slot.HighFrequencyScale > 0f)
@@ -353,11 +401,7 @@ internal sealed class MaterialTextureApplicator
             return false;
         }
 
-        string path = Path.IsPathRooted(relativeOrAbsolutePath)
-            ? relativeOrAbsolutePath
-            : Path.Combine(_rootPath, relativeOrAbsolutePath.Replace('/', Path.DirectorySeparatorChar));
-
-        return File.Exists(path);
+        return TextureLoader.TryResolveExistingTexturePath(_rootPath, relativeOrAbsolutePath, out _);
     }
 
     private static bool SetTexture(Material material, HashSet<int> textureProperties, IEnumerable<MaterialProperty> properties, Texture texture)
@@ -757,6 +801,22 @@ internal sealed class MaterialTextureApplicator
         public int Id { get; }
 
         public string Name { get; }
+    }
+
+    private readonly struct SlotResources
+    {
+        public SlotResources(TextureSlotConfig slot, Texture2D? baseTexture, Texture2D? normalTexture)
+        {
+            Slot = slot;
+            BaseTexture = baseTexture;
+            NormalTexture = normalTexture;
+        }
+
+        public TextureSlotConfig Slot { get; }
+
+        public Texture2D? BaseTexture { get; }
+
+        public Texture2D? NormalTexture { get; }
     }
 
     private sealed class MaterialSnapshot

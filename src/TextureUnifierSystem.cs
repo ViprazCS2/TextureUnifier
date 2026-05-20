@@ -7,7 +7,8 @@ namespace TextureUnifier;
 
 public sealed class TextureUnifierSystem : GameSystemBase
 {
-    private const float MinNetworkRescanIntervalSeconds = 30f;
+    private const float InitialNetworkScanDelaySeconds = 0.75f;
+    private const float MinNetworkRescanIntervalSeconds = 300f;
 
     internal static TextureUnifierSystem? ActiveSystem { get; private set; }
 
@@ -81,7 +82,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
             }
 
             _nextTerrainApply = now + _config.TerrainApplyIntervalSeconds;
-            _nextNetworkScan = GetNextNetworkScanTime(now, _config.Networks);
+            _nextNetworkScan = float.PositiveInfinity;
             _nextFoliageApply = now + 1f;
             return;
         }
@@ -214,7 +215,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
             _lastConfigWriteTime = File.GetLastWriteTimeUtc(_configPath);
             _networkDisabledAfterFailure = false;
             _nextTerrainApply = now + 0.25f;
-            _nextNetworkScan = now + 0.75f;
+            _nextNetworkScan = now + InitialNetworkScanDelaySeconds;
             _nextFoliageApply = _config.Foliage.Enabled && !_config.Foliage.ApplyEveryFrame
                 ? now + 1.25f
                 : now + 1f;
@@ -252,5 +253,7 @@ public sealed class TextureUnifierSystem : GameSystemBase
             : now + 1f;
 
     private static float GetNextNetworkScanTime(float now, NetworkTextureConfig config) =>
-        now + Math.Max(MinNetworkRescanIntervalSeconds, config.RescanIntervalSeconds);
+        config.RescanIntervalSeconds <= 0f
+            ? float.PositiveInfinity
+            : now + Math.Max(MinNetworkRescanIntervalSeconds, config.RescanIntervalSeconds);
 }
